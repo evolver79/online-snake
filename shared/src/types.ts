@@ -1,7 +1,10 @@
-export type Direction   = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+export type Direction    = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 export type DungeonPhase = 'start' | 'playing' | 'respawn' | 'dead';
-export type CellType    = 'wall' | 'floor' | 'exit';
-export type EnemyType   = 'rat' | 'skeleton' | 'demon';
+export type CellType     = 'wall' | 'floor' | 'exit';
+export type EnemyType    = 'rat' | 'skeleton' | 'demon' | 'boss';
+export type PickupType   = 'heart' | 'gem';
+
+export interface Pickup { id: number; type: PickupType; pos: Point; }
 
 export interface Point { x: number; y: number; }
 
@@ -25,6 +28,7 @@ export interface DungeonState {
   rooms:         Room[];
   snake:         { segments: Point[]; dir: Direction; nextDir: Direction; };
   enemies:       Enemy[];
+  pickups:       Pickup[];
   floor:         number;
   score:         number;
   lives:         number;
@@ -32,7 +36,8 @@ export interface DungeonState {
   snakeMoveTick: number;
   enemyMoveTick: number;
   invincible:    number;
-  exitPos:       Point | null;   // null until all enemies dead
-  message:       string;         // flash message ("FLOOR 2", "BOSS SLAIN")
+  exitPos:       Point | null;
+  isBossFloor:   boolean;
+  message:       string;
   messageTick:   number;
 }

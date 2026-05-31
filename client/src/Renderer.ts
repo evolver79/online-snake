@@ -1,4 +1,4 @@
-import type { DungeonState, Enemy } from '@shared/types';
+import type { DungeonState, Enemy, Pickup } from '@shared/types';
 import { CANVAS_W, CANVAS_H, CELL, MAP_W, MAP_H, HUD_H, INVINCIBLE_TICKS } from '@shared/constants';
 
 // ── Palette ─────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ const ENEMY_COLORS: Record<string, [string, string]> = {
   rat:      ['#aa1122', '#ff3344'],
   skeleton: ['#667788', '#99aabb'],
   demon:    ['#cc4400', '#ff8833'],
+  boss:     ['#440066', '#aa44ff'],
 };
 
 // ── Pixel font glyphs (4×5) ──────────────────────────────────────────────────
@@ -84,6 +85,9 @@ export class Renderer {
 
     // Exit marker
     if (state.exitPos) this.drawExit(ctx, state.exitPos, state.tick);
+
+    // Pickups
+    for (const p of state.pickups) this.drawPickup(ctx, p, state.tick);
 
     // Enemies
     for (const e of state.enemies) this.drawEnemy(ctx, e, state.tick);
@@ -158,10 +162,65 @@ export class Renderer {
     ctx.fillRect(px + 4, py + 7, 2, 1);  // bottom point step 2
   }
 
+  private drawPickup(ctx: CanvasRenderingContext2D, p: Pickup, tick: number): void {
+    const px  = p.pos.x * CELL;
+    const py  = p.pos.y * CELL;
+    const blink = Math.floor(tick / 20) % 2;
+
+    if (p.type === 'gem') {
+      // Diamond shape, cyan/blue pulsing
+      ctx.fillStyle = blink ? '#44ddff' : '#1199cc';
+      ctx.fillRect(px + 4, py + 1, 2, 1);
+      ctx.fillRect(px + 3, py + 2, 4, 1);
+      ctx.fillRect(px + 2, py + 3, 6, 2);
+      ctx.fillRect(px + 3, py + 5, 4, 1);
+      ctx.fillRect(px + 4, py + 6, 2, 1);
+      // Highlight
+      ctx.fillStyle = '#aaeeff';
+      ctx.fillRect(px + 4, py + 2, 1, 1);
+    } else {
+      // Heart pickup — red, floating
+      const oy = blink ? 0 : 1;
+      ctx.fillStyle = '#cc2244';
+      const shape = [0b0110110, 0b1111111, 0b1111111, 0b0111110, 0b0011100, 0b0001000];
+      for (let row = 0; row < shape.length; row++)
+        for (let col = 0; col < 7; col++)
+          if (shape[row] & (1 << (6 - col))) ctx.fillRect(px + col + 1, py + row + oy + 1, 1, 1);
+    }
+  }
+
   private drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, tick: number): void {
     const px = e.pos.x * CELL;
     const py = e.pos.y * CELL;
     const [dark, light] = ENEMY_COLORS[e.type] ?? ENEMY_COLORS['rat'];
+
+    if (e.type === 'boss') {
+      // Large skull — menacing purple, bobs and glows
+      const bob = tick % 30 < 15 ? 0 : 1;
+      // Body
+      ctx.fillStyle = dark;  ctx.fillRect(px + 1, py + 1 + bob, 8, 7);
+      ctx.fillStyle = light; ctx.fillRect(px + 2, py + 2 + bob, 6, 5);
+      // Eye sockets — glowing red
+      ctx.fillStyle = '#ff2200'; ctx.fillRect(px + 2, py + 3 + bob, 2, 2);
+      ctx.fillStyle = '#ff2200'; ctx.fillRect(px + 6, py + 3 + bob, 2, 2);
+      ctx.fillStyle = '#ff6633'; ctx.fillRect(px + 3, py + 3 + bob, 1, 1);
+      ctx.fillStyle = '#ff6633'; ctx.fillRect(px + 7, py + 3 + bob, 1, 1);
+      // Teeth
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(px + 2, py + 7 + bob, 2, 1);
+      ctx.fillRect(px + 5, py + 7 + bob, 2, 1);
+      // Crown
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(px + 1, py - 1 + bob, 1, 3);
+      ctx.fillRect(px + 4, py - 2 + bob, 2, 4);
+      ctx.fillRect(px + 8, py - 1 + bob, 1, 3);
+      // HP pips below
+      for (let i = 0; i < e.hp; i++) {
+        ctx.fillStyle = '#ff2200';
+        ctx.fillRect(px + 1 + i * 2, py + 9, 1, 1);
+      }
+      return;
+    }
 
     if (e.type === 'rat') {
       // Small oval body

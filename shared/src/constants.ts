@@ -18,3 +18,7 @@ export const INVINCIBLE_TICKS = 120;  // after losing a life
 
 export const MIN_ROOMS = 4;
 export const MAX_ROOMS = 7;
+
+export const GEM_SCORE_BASE   = 20;   // × floor multiplier
+export const BOSS_FLOOR_EVERY = 5;
+export const MAX_LIVES        = 5;

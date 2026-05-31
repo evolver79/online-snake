@@ -1,8 +1,9 @@
-import type { DungeonState, CellType, Enemy, EnemyType, Point, Room, Direction } from './types';
+import type { DungeonState, CellType, Enemy, EnemyType, Pickup, Point, Room, Direction } from './types';
 import {
   MAP_W, MAP_H, INIT_SNAKE_LEN, INIT_LIVES,
   SNAKE_MOVE_BASE, SNAKE_MOVE_MIN, ENEMY_MOVE_BASE, ENEMY_MOVE_MIN,
   INVINCIBLE_TICKS, MIN_ROOMS, MAX_ROOMS,
+  GEM_SCORE_BASE, BOSS_FLOOR_EVERY, MAX_LIVES,
 } from './constants';
 
 let _uid = 1;
@@ -30,7 +31,7 @@ function roomCenter(r: Room): Point {
   return { x: r.x + Math.floor(r.w / 2), y: r.y + Math.floor(r.h / 2) };
 }
 
-function generateFloor(floor: number): { grid: CellType[][]; rooms: Room[]; enemies: Enemy[]; startPos: Point; exitPos: Point | null } {
+function generateFloor(floor: number): { grid: CellType[][]; rooms: Room[]; enemies: Enemy[]; pickups: Pickup[]; startPos: Point; exitPos: Point | null; isBossFloor: boolean } {
   const seed = { v: floor * 1337 + 42 };
   const grid: CellType[][] = Array.from({ length: MAP_H }, () => new Array(MAP_W).fill('wall') as CellType[]);
 
@@ -67,41 +68,85 @@ function generateFloor(floor: number): { grid: CellType[][]; rooms: Room[]; enem
     const a = roomCenter(rooms[i - 1]);
     const b = roomCenter(rooms[i]);
     const midX = rng(seed) < 0.5 ? a.x : b.x;
-    // Horizontal segments (2 cells tall)
     for (let cx = Math.min(a.x, midX); cx <= Math.max(a.x, midX); cx++) { carve(cx, a.y); carve(cx, a.y + 1); }
     for (let cx = Math.min(midX, b.x); cx <= Math.max(midX, b.x); cx++) { carve(cx, b.y); carve(cx, b.y + 1); }
-    // Vertical segment (2 cells wide)
     for (let cy = Math.min(a.y, b.y); cy <= Math.max(a.y, b.y); cy++) { carve(midX, cy); carve(midX + 1, cy); }
   }
 
-  // Place enemies in non-start rooms
+  // ── Enemies ──────────────────────────────────────────────────────────────
   const enemies: Enemy[] = [];
-  const types: EnemyType[] = floor < 3 ? ['rat'] : floor < 5 ? ['rat', 'skeleton'] : ['rat', 'skeleton', 'demon'];
-  for (let i = 1; i < rooms.length; i++) {
-    const room  = rooms[i];
-    const count = 1 + Math.floor(rng(seed) * Math.min(3, 1 + Math.floor(floor / 2)));
-    for (let k = 0; k < count; k++) {
-      const type: EnemyType = types[Math.floor(rng(seed) * types.length)];
-      enemies.push({
-        id:       uid(),
-        type,
-        pos: {
-          x: room.x + 1 + Math.floor(rng(seed) * (room.w - 2)),
-          y: room.y + 1 + Math.floor(rng(seed) * (room.h - 2)),
-        },
-        roomIdx:  i,
-        hp:       type === 'demon' ? 2 : 1,
-        segments: type === 'rat' ? 1 : type === 'skeleton' ? 2 : 3,
-      });
+  const isBossFloor = floor % BOSS_FLOOR_EVERY === 0;
+
+  if (isBossFloor) {
+    // Boss lives in the last room
+    const bossRoom = rooms[rooms.length - 1];
+    enemies.push({
+      id:       uid(),
+      type:     'boss',
+      pos:      roomCenter(bossRoom),
+      roomIdx:  rooms.length - 1,
+      hp:       5,
+      segments: 10,
+    });
+  } else {
+    const types: EnemyType[] = floor < 3 ? ['rat'] : floor < 5 ? ['rat', 'skeleton'] : ['rat', 'skeleton', 'demon'];
+    for (let i = 1; i < rooms.length; i++) {
+      const room  = rooms[i];
+      const count = 1 + Math.floor(rng(seed) * Math.min(3, 1 + Math.floor(floor / 2)));
+      for (let k = 0; k < count; k++) {
+        const type: EnemyType = types[Math.floor(rng(seed) * types.length)];
+        enemies.push({
+          id:       uid(),
+          type,
+          pos: {
+            x: room.x + 1 + Math.floor(rng(seed) * (room.w - 2)),
+            y: room.y + 1 + Math.floor(rng(seed) * (room.h - 2)),
+          },
+          roomIdx:  i,
+          hp:       type === 'demon' ? 2 : 1,
+          segments: type === 'rat' ? 1 : type === 'skeleton' ? 2 : 3,
+        });
+      }
     }
   }
 
+  // ── Pickups ───────────────────────────────────────────────────────────────
   const startPos = roomCenter(rooms[0]);
+  const occupied = new Set(enemies.map(e => `${e.pos.x},${e.pos.y}`));
+  occupied.add(`${startPos.x},${startPos.y}`);
+
+  const pickups: Pickup[] = [];
+  const tryPlacePickup = (type: Pickup['type'], roomIdx: number) => {
+    const room = rooms[roomIdx];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const x = room.x + 1 + Math.floor(rng(seed) * (room.w - 2));
+      const y = room.y + 1 + Math.floor(rng(seed) * (room.h - 2));
+      const key = `${x},${y}`;
+      if (!occupied.has(key) && grid[y][x] === 'floor') {
+        occupied.add(key);
+        pickups.push({ id: uid(), type, pos: { x, y } });
+        return;
+      }
+    }
+  };
+
+  // Gems: 2–4 spread across non-start rooms
+  const gemCount = 2 + Math.floor(rng(seed) * 3);
+  for (let i = 0; i < gemCount; i++) {
+    const roomIdx = 1 + Math.floor(rng(seed) * (rooms.length - 1));
+    tryPlacePickup('gem', roomIdx);
+  }
+  // Heart: one per floor with 60% chance (guaranteed on boss floors)
+  if (isBossFloor || rng(seed) < 0.6) {
+    const roomIdx = 1 + Math.floor(rng(seed) * (rooms.length - 1));
+    tryPlacePickup('heart', roomIdx);
+  }
+
   // Exit revealed once all enemies die
   const exitPos: Point | null = enemies.length === 0 ? roomCenter(rooms[rooms.length - 1]) : null;
-  if (exitPos && enemies.length === 0) grid[exitPos.y][exitPos.x] = 'exit';
+  if (exitPos) grid[exitPos.y][exitPos.x] = 'exit';
 
-  return { grid, rooms, enemies, startPos, exitPos };
+  return { grid, rooms, enemies, pickups, startPos, exitPos, isBossFloor };
 }
 
 // ── Engine ────────────────────────────────────────────────────────────────
@@ -118,18 +163,20 @@ export class GameEngine {
   }
 
   private buildState(floor: number, lives: number, score: number): DungeonState {
-    const { grid, rooms, enemies, startPos, exitPos } = generateFloor(floor);
+    const { grid, rooms, enemies, pickups, startPos, exitPos, isBossFloor } = generateFloor(floor);
     const segments: Point[] = [];
     for (let i = 0; i < INIT_SNAKE_LEN; i++) {
       segments.push({ x: startPos.x - i, y: startPos.y });
     }
 
+    const isBoss = isBossFloor;
     return {
       phase:         'playing',
       grid,
       rooms,
       snake:         { segments, dir: 'RIGHT', nextDir: 'RIGHT' },
       enemies,
+      pickups,
       floor,
       score,
       lives,
@@ -138,8 +185,9 @@ export class GameEngine {
       enemyMoveTick: 0,
       invincible:    0,
       exitPos,
-      message:       floor === 1 ? '' : `FLOOR  ${floor}`,
-      messageTick:   floor === 1 ? 0 : 90,
+      isBossFloor:   isBoss,
+      message:       isBoss ? 'BOSS FLOOR' : (floor === 1 ? '' : `FLOOR  ${floor}`),
+      messageTick:   isBoss ? 120             : (floor === 1 ? 0  : 90),
     };
   }
 
@@ -233,6 +281,19 @@ export class GameEngine {
           s.message    = 'DUNGEON CLEARED';
           s.messageTick = 90;
         }
+      }
+    }
+
+    // Pickup collection
+    const hitPickup = s.pickups.find(p => p.pos.x === next.x && p.pos.y === next.y);
+    if (hitPickup) {
+      s.pickups = s.pickups.filter(p => p.id !== hitPickup.id);
+      if (hitPickup.type === 'heart') {
+        s.lives = Math.min(s.lives + 1, MAX_LIVES);
+        s.message = 'EXTRA LIFE';  s.messageTick = 60;
+      } else {
+        s.score += GEM_SCORE_BASE * s.floor;
+        s.message = 'GEM';  s.messageTick = 40;
       }
     }
 

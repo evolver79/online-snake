@@ -166,9 +166,10 @@ export class GameEngine {
     const snakeMoveEvery = Math.max(SNAKE_MOVE_MIN, SNAKE_MOVE_BASE - Math.floor(floor / 2));
     const enemyMoveEvery = Math.max(ENEMY_MOVE_MIN, ENEMY_MOVE_BASE - floor);
 
-    // ── Snake move ───────────────────────────────────────────────────────
+    // ── Snake move (frozen for first 40 ticks of post-respawn invincibility) ──
+    const respawnFreeze = s.invincible > INVINCIBLE_TICKS - 40;
     s.snakeMoveTick++;
-    if (s.snakeMoveTick >= snakeMoveEvery) {
+    if (!respawnFreeze && s.snakeMoveTick >= snakeMoveEvery) {
       s.snakeMoveTick = 0;
       this.moveSnake();
       if (s.phase !== 'playing') return s;
@@ -314,10 +315,9 @@ export class GameEngine {
       s.phase = 'dead';
       return;
     }
-    // Respawn at start room, shorter snake, invincibility
+    // Respawn at start room — always reset to starting length so segments stay within the room
     const start      = roomCenter(s.rooms[0]);
-    const newLen     = Math.max(INIT_SNAKE_LEN, Math.floor(s.snake.segments.length / 2));
-    s.snake.segments = Array.from({ length: newLen }, (_, i) => ({ x: start.x - i, y: start.y }));
+    s.snake.segments = Array.from({ length: INIT_SNAKE_LEN }, (_, i) => ({ x: start.x - i, y: start.y }));
     s.snake.dir      = 'RIGHT';
     s.snake.nextDir  = 'RIGHT';
     s.invincible     = INVINCIBLE_TICKS;

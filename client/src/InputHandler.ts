@@ -1,33 +1,36 @@
-import type { Direction } from '@shared/types';
-
-const KEY_TO_DIR: Record<string, Direction> = {
-  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
-  w: 'UP', W: 'UP',
-  s: 'DOWN', S: 'DOWN',
-  a: 'LEFT', A: 'LEFT',
-  d: 'RIGHT', D: 'RIGHT',
-};
+const JUMP_KEYS  = new Set(['ArrowUp', 'w', 'W', ' ']);
+const SLIDE_KEYS = new Set(['ArrowDown', 's', 'S']);
 
 export class InputHandler {
-  private onDirection: (dir: Direction) => void;
+  private onJump:   (pressed: boolean) => void;
+  private onSlide:  (pressed: boolean) => void;
   private onAnyKey: () => void;
 
-  constructor(onDirection: (dir: Direction) => void, onAnyKey: () => void) {
-    this.onDirection = onDirection;
+  constructor(
+    onJump:   (pressed: boolean) => void,
+    onSlide:  (pressed: boolean) => void,
+    onAnyKey: () => void,
+  ) {
+    this.onJump   = onJump;
+    this.onSlide  = onSlide;
     this.onAnyKey = onAnyKey;
-    window.addEventListener('keydown', this.handleKey);
+    window.addEventListener('keydown', this.onDown);
+    window.addEventListener('keyup',   this.onUp);
   }
 
-  private handleKey = (e: KeyboardEvent): void => {
-    const dir = KEY_TO_DIR[e.key];
-    if (dir) {
-      e.preventDefault();
-      this.onDirection(dir);
-    }
+  private onDown = (e: KeyboardEvent): void => {
+    if (JUMP_KEYS.has(e.key))  { e.preventDefault(); this.onJump(true); }
+    if (SLIDE_KEYS.has(e.key)) { e.preventDefault(); this.onSlide(true); }
     this.onAnyKey();
   };
 
+  private onUp = (e: KeyboardEvent): void => {
+    if (JUMP_KEYS.has(e.key))  this.onJump(false);
+    if (SLIDE_KEYS.has(e.key)) this.onSlide(false);
+  };
+
   destroy(): void {
-    window.removeEventListener('keydown', this.handleKey);
+    window.removeEventListener('keydown', this.onDown);
+    window.removeEventListener('keyup',   this.onUp);
   }
 }

@@ -1,7 +1,28 @@
-export const GRID_SIZE            = 40;
-export const TICK_RATE_MS         = 100;
-export const INITIAL_SNAKE_LENGTH = 3;
-export const COMBO_WINDOW_TICKS   = 10;  // ticks to land next eat and keep combo alive
-export const PORTAL_SPAWN_EAT     = 5;   // eat-count at which portals first appear
-export const PORTAL_RESPAWN_EVERY = 8;   // respawn portals every N eats after first
-export const WALL_COUNT           = 5;   // random interior obstacles per game
+export const CANVAS_W          = 480;
+export const CANVAS_H          = 270;
+
+export const HEAD_X            = 90;    // fixed screen X of snake head
+export const SEG_SIZE          = 10;    // segment square size in logical px
+export const SEG_GAP           = 13;    // pixels between segment centers
+export const Y_HISTORY_SIZE    = 2048;  // circular Y-position buffer size
+
+export const GROUND_Y          = 215;   // Y of ground surface (top of ground)
+export const TILE_W            = 16;    // ground tile width in px
+
+export const GRAVITY           = 0.38;
+export const JUMP_FORCE        = 7.8;
+export const SLIDE_FRAMES      = 42;
+
+export const INIT_SPEED        = 2.2;   // px/frame
+export const MAX_SPEED         = 8.0;
+export const SPEED_ACCEL       = 0.00018;
+
+export const INIT_LIVES        = 3;
+export const INVINCIBLE_FRAMES = 100;
+
+export const SPAWN_X           = CANVAS_W + 40;
+
+// Difficulty thresholds (pixels scrolled)
+export const DIFF_1            = 800;
+export const DIFF_2            = 2000;
+export const DIFF_3            = 4000;

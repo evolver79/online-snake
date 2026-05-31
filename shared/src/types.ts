@@ -1,39 +1,44 @@
-export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-export type GamePhase = 'start' | 'playing' | 'gameover';
+export type RunnerPhase = 'start' | 'playing' | 'dead';
 
-export interface Cell {
-  x: number;
-  y: number;
+export interface Obstacle {
+  id:   number;
+  x:    number;   // screen X (decreases as world scrolls)
+  y:    number;   // screen Y (top of obstacle)
+  w:    number;
+  h:    number;
+  type: 'spike' | 'bar' | 'wall';
 }
 
-export interface SnakeState {
-  segments: Cell[];
-  direction: Direction;
-  nextDirection: Direction;
+export interface Fruit {
+  id:        number;
+  x:         number;
+  y:         number;
+  collected: boolean;
 }
 
-export interface FoodState {
-  position: Cell;
-  type: 'normal';
+export interface GroundTile {
+  x:     number;   // screen X of tile left edge
+  solid: boolean;  // false = gap
 }
 
-export interface PortalState {
-  a: Cell;
-  b: Cell;
-}
-
-export type DeathCause = 'boundary' | 'wall' | 'self';
-
-export interface GameState {
-  phase:      GamePhase;
-  snake:      SnakeState;
-  food:       FoodState;
-  score:      number;
-  tick:       number;
-  combo:      number;       // current multiplier (1–4)
-  comboTicks: number;       // ticks remaining in combo window (0 = expired)
-  portals:    PortalState | null;
-  portalUsed: boolean;      // true if a portal was traversed this tick
-  walls:      Cell[];       // random interior obstacle positions
-  deathCause: DeathCause | null;
+export interface RunnerState {
+  phase:       RunnerPhase;
+  headY:       number;      // head Y in screen space
+  vy:          number;      // vertical velocity
+  onGround:    boolean;
+  sliding:     boolean;
+  slideTicks:  number;
+  invincible:  number;      // frames of invincibility remaining after hit
+  yHistory:    number[];    // circular buffer: head Y indexed by scroll distance
+  totalScroll: number;      // accumulated scroll distance (px)
+  segments:    number;      // body segment count (grows on eat)
+  ground:      GroundTile[];
+  obstacles:   Obstacle[];
+  fruits:      Fruit[];
+  score:       number;
+  distance:    number;      // meters (totalScroll / 10, rounded)
+  scrollSpeed: number;
+  tick:        number;
+  lives:       number;
+  jumpQueued:  boolean;     // jump buffering: input arrived just before landing
 }

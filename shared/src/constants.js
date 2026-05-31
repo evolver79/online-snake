@@ -1,0 +1,21 @@
+export const CANVAS_W = 480;
+export const CANVAS_H = 270;
+export const HEAD_X = 90; // fixed screen X of snake head
+export const SEG_SIZE = 10; // segment square size in logical px
+export const SEG_GAP = 13; // pixels between segment centers
+export const Y_HISTORY_SIZE = 2048; // circular Y-position buffer size
+export const GROUND_Y = 215; // Y of ground surface (top of ground)
+export const TILE_W = 16; // ground tile width in px
+export const GRAVITY = 0.38;
+export const JUMP_FORCE = 7.8;
+export const SLIDE_FRAMES = 42;
+export const INIT_SPEED = 2.2; // px/frame
+export const MAX_SPEED = 8.0;
+export const SPEED_ACCEL = 0.00018;
+export const INIT_LIVES = 3;
+export const INVINCIBLE_FRAMES = 100;
+export const SPAWN_X = CANVAS_W + 40;
+// Difficulty thresholds (pixels scrolled)
+export const DIFF_1 = 800;
+export const DIFF_2 = 2000;
+export const DIFF_3 = 4000;

@@ -38,19 +38,12 @@
       pointer-events: none;
       font-family: 'Share Tech Mono', monospace;
       color: #22cc44;
-      background: rgba(8,6,18,0.72);
+      /* no background — canvas draws the dark rect + pixel title */
     }
 
     #overlay.hidden { display: none; }
 
-    #overlay-title {
-      font-family: 'Orbitron', sans-serif;
-      font-weight: 900;
-      font-size: clamp(18px, 4.5vw, 38px);
-      letter-spacing: 8px;
-      text-shadow: 0 0 10px #22cc44, 0 0 28px #116622;
-      margin-bottom: 10px;
-    }
+    #overlay-title { display: none; } /* title rendered on canvas */
 
     #overlay-score {
       font-family: 'Orbitron', sans-serif;

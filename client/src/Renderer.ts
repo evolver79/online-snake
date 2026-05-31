@@ -114,6 +114,11 @@ export class Renderer {
       this.drawMessage(ctx, 'PRESS ANY KEY', 60);
     }
 
+    // Start / game-over title overlay (drawn on canvas so it uses the pixel font)
+    if (state.phase === 'start' || state.phase === 'dead') {
+      this.drawTitleOverlay(ctx, state.phase, state.tick);
+    }
+
     // CRT
     ctx.drawImage(this.overlay, 0, 0);
   }
@@ -316,6 +321,49 @@ export class Renderer {
     // Snake length
     const lenStr = `LEN  ${state.snake.segments.length}`;
     this.pixelText(ctx, lenStr, CANVAS_W - 8 - lenStr.length * 5, y0 + 32, 1);
+  }
+
+  private drawTitleOverlay(ctx: CanvasRenderingContext2D, phase: string, tick: number): void {
+    const playH = MAP_H * CELL; // 220px
+
+    // Dark background over play area
+    ctx.fillStyle = 'rgba(8,6,18,0.78)';
+    ctx.fillRect(0, 0, CANVAS_W, playH);
+
+    if (phase === 'start') {
+      // "SNAKE" + "DUNGEON" stacked, scale 5 — glow then bright layer
+      const s1 = 'SNAKE';
+      const s2 = 'DUNGEON';
+      const sc = 5;
+      const cw = (4 + 1) * sc;
+      const x1 = Math.floor((CANVAS_W - s1.length * cw) / 2);
+      const x2 = Math.floor((CANVAS_W - s2.length * cw) / 2);
+      const y1 = 70;
+      const y2 = y1 + 4 * sc + 8; // char height (4 rows * sc) + gap
+
+      ctx.fillStyle = '#0d3318';
+      this.pixelText(ctx, s1, x1 + 1, y1 + 1, sc);
+      this.pixelText(ctx, s2, x2 + 1, y2 + 1, sc);
+      ctx.fillStyle = SNAKE_HEAD;
+      this.pixelText(ctx, s1, x1, y1, sc);
+      ctx.fillStyle = '#22bb44';
+      this.pixelText(ctx, s2, x2, y2, sc);
+    } else {
+      // "GAME OVER" — red, scale 4
+      const msg = 'GAME OVER';
+      const sc  = 4;
+      const x   = Math.floor((CANVAS_W - msg.length * (4 + 1) * sc) / 2);
+      const y   = Math.floor(playH / 2) - 2 * sc * 4;
+
+      ctx.fillStyle = '#440000';
+      this.pixelText(ctx, msg, x + 1, y + 1, sc);
+      ctx.fillStyle = '#ff3333';
+      this.pixelText(ctx, msg, x, y, sc);
+    }
+
+    // Subtle scanline shimmer on the text area
+    ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.04 * Math.sin(tick * 0.05)})`;
+    ctx.fillRect(0, 0, CANVAS_W, playH);
   }
 
   private drawMessage(ctx: CanvasRenderingContext2D, msg: string, tick: number): void {

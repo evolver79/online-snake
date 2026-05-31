@@ -9,14 +9,16 @@ const KEY_DIR: Record<string, Direction> = {
 
 export class InputHandler {
   constructor(
-    private onDir:    (d: Direction) => void,
-    private onAnyKey: () => void,
+    private onDir:       (d: Direction) => void,
+    private onAnyKey:    () => void,
+    private onToggleLb:  () => void,
   ) {
     window.addEventListener('keydown', this.handle);
     window.addEventListener('pointerup', this.handleClick);
   }
 
   private handle = (e: KeyboardEvent): void => {
+    if (e.key === 'Tab') { e.preventDefault(); this.onToggleLb(); return; }
     const dir = KEY_DIR[e.key];
     if (dir) { e.preventDefault(); this.onDir(dir); }
     this.onAnyKey();
@@ -25,6 +27,7 @@ export class InputHandler {
   private handleClick = (e: PointerEvent): void => {
     const target = e.target as HTMLElement;
     if (target.closest('#name-entry')) return;
+    if (target.closest('#leaderboard'))  { this.onToggleLb(); return; }
     this.onAnyKey();
   };
 

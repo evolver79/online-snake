@@ -37,6 +37,7 @@ export class Game {
     this.input    = new InputHandler(
       d  => this.engine.setDirection(d),
       () => this.onAnyKey(),
+      () => this.toggleLb(),
     );
     this.lb = new Leaderboard((name, score) => this.showToast(`${name}  ${score}`));
     this.lb.subscribe();
@@ -137,6 +138,17 @@ export class Game {
   }
 
   private skipName(): void { this.finishName(); }
+
+  private toggleLb(): void {
+    if (this.lbEl.classList.contains('hidden')) {
+      this.fetchLb();          // refresh before showing
+    } else {
+      // only hide during gameplay — keep visible on start/dead screens
+      if (this.engine.getState().phase === 'playing' || this.engine.getState().phase === 'respawn') {
+        this.lbEl.classList.add('hidden');
+      }
+    }
+  }
 
   private finishName(): void {
     this.nameSubmitted = true;

@@ -85,6 +85,7 @@ export class Game {
     this.lbEl.classList.add('hidden');
     this.nameEntry.classList.add('hidden');
     this.hintsEl.classList.add('hidden');
+    this.lastTickTime = performance.now();
     this.engine.start();
     sound.uiClick();
   }
@@ -174,18 +175,27 @@ export class Game {
   }
 
   private prevPhase = 'start';
+  private lastTickTime = 0;
+  private readonly TICK_MS = 1000 / 60; // fixed 60 logic-ticks/sec regardless of display Hz
 
   private loop = (time: number): void => {
     this.rafId = requestAnimationFrame(this.loop);
-    const state = this.engine.getState();
 
-    if (state.phase === 'playing') {
-      this.engine.tick();
-      const next = this.engine.getState();
-      if (next.phase === 'dead' && this.prevPhase === 'playing') {
-        this.showDead(next.score);
+    if (this.engine.getState().phase === 'playing') {
+      const elapsed = time - this.lastTickTime;
+      const steps   = Math.floor(elapsed / this.TICK_MS);
+      if (steps > 0) {
+        this.lastTickTime = time - (elapsed % this.TICK_MS);
+        for (let i = 0; i < steps; i++) {
+          this.engine.tick();
+          const next = this.engine.getState();
+          if (next.phase === 'dead' && this.prevPhase === 'playing') {
+            this.showDead(next.score);
+          }
+          this.prevPhase = next.phase;
+          if (next.phase !== 'playing') break;
+        }
       }
-      this.prevPhase = next.phase;
     }
 
     this.renderer.render(this.engine.getState(), time);

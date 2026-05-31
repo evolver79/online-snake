@@ -1,0 +1,6 @@
+[build]
+  command   = "npm --prefix client install && npm --prefix client run build"
+  publish   = "client/dist"
+
+[build.environment]
+  NODE_VERSION = "20"

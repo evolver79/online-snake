@@ -13,6 +13,7 @@ export class InputHandler {
     private onAnyKey: () => void,
   ) {
     window.addEventListener('keydown', this.handle);
+    window.addEventListener('pointerup', this.handleClick);
   }
 
   private handle = (e: KeyboardEvent): void => {
@@ -21,5 +22,14 @@ export class InputHandler {
     this.onAnyKey();
   };
 
-  destroy(): void { window.removeEventListener('keydown', this.handle); }
+  private handleClick = (e: PointerEvent): void => {
+    const target = e.target as HTMLElement;
+    if (target.closest('#name-entry')) return;
+    this.onAnyKey();
+  };
+
+  destroy(): void {
+    window.removeEventListener('keydown', this.handle);
+    window.removeEventListener('pointerup', this.handleClick);
+  }
 }

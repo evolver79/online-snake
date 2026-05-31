@@ -116,7 +116,7 @@ export class Renderer {
 
     // Start / game-over title overlay (drawn on canvas so it uses the pixel font)
     if (state.phase === 'start' || state.phase === 'dead') {
-      this.drawTitleOverlay(ctx, state.phase, state.tick);
+      this.drawTitleOverlay(ctx, state);
     }
 
     // CRT
@@ -323,15 +323,15 @@ export class Renderer {
     this.pixelText(ctx, lenStr, CANVAS_W - 8 - lenStr.length * 5, y0 + 32, 1);
   }
 
-  private drawTitleOverlay(ctx: CanvasRenderingContext2D, phase: string, tick: number): void {
+  private drawTitleOverlay(ctx: CanvasRenderingContext2D, state: DungeonState): void {
     const playH = MAP_H * CELL; // 220px
 
     // Dark background over play area
     ctx.fillStyle = 'rgba(8,6,18,0.78)';
     ctx.fillRect(0, 0, CANVAS_W, playH);
 
-    if (phase === 'start') {
-      // "SNAKE" + "DUNGEON" stacked, scale 5 — glow then bright layer
+    if (state.phase === 'start') {
+      // "SNAKE" + "DUNGEON" stacked, scale 5
       const s1 = 'SNAKE';
       const s2 = 'DUNGEON';
       const sc = 5;
@@ -339,7 +339,7 @@ export class Renderer {
       const x1 = Math.floor((CANVAS_W - s1.length * cw) / 2);
       const x2 = Math.floor((CANVAS_W - s2.length * cw) / 2);
       const y1 = 70;
-      const y2 = y1 + 4 * sc + 8; // char height (4 rows * sc) + gap
+      const y2 = y1 + 4 * sc + 8;
 
       ctx.fillStyle = '#0d3318';
       this.pixelText(ctx, s1, x1 + 1, y1 + 1, sc);
@@ -350,19 +350,32 @@ export class Renderer {
       this.pixelText(ctx, s2, x2, y2, sc);
     } else {
       // "GAME OVER" — red, scale 4
-      const msg = 'GAME OVER';
       const sc  = 4;
-      const x   = Math.floor((CANVAS_W - msg.length * (4 + 1) * sc) / 2);
-      const y   = Math.floor(playH / 2) - 2 * sc * 4;
+      const cw  = (4 + 1) * sc;
+      const go  = 'GAME OVER';
+      const gox = Math.floor((CANVAS_W - go.length * cw) / 2);
+      const goy = 55;
 
       ctx.fillStyle = '#440000';
-      this.pixelText(ctx, msg, x + 1, y + 1, sc);
+      this.pixelText(ctx, go, gox + 1, goy + 1, sc);
       ctx.fillStyle = '#ff3333';
-      this.pixelText(ctx, msg, x, y, sc);
+      this.pixelText(ctx, go, gox, goy, sc);
+
+      // Score — green, scale 4, well below the title
+      const scoreStr = String(state.score);
+      const sc2  = 4;
+      const cw2  = (4 + 1) * sc2;
+      const sx   = Math.floor((CANVAS_W - scoreStr.length * cw2) / 2);
+      const sy   = goy + 4 * sc + 28; // 4 rows tall + 28px gap
+
+      ctx.fillStyle = '#0a2a10';
+      this.pixelText(ctx, scoreStr, sx + 1, sy + 1, sc2);
+      ctx.fillStyle = HUD_GREEN;
+      this.pixelText(ctx, scoreStr, sx, sy, sc2);
     }
 
-    // Subtle scanline shimmer on the text area
-    ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.04 * Math.sin(tick * 0.05)})`;
+    // Subtle shimmer
+    ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.04 * Math.sin(state.tick * 0.05)})`;
     ctx.fillRect(0, 0, CANVAS_W, playH);
   }
 

@@ -70,7 +70,8 @@ export class Game {
   private onAnyKey(): void {
     if (!this.nameEntry.classList.contains('hidden')) return;
     const phase = this.engine.getState().phase;
-    if (phase === 'start') { this.startGame(); return; }
+    if (phase === 'start')   { this.startGame(); return; }
+    if (phase === 'respawn') { this.engine.resume(); return; }
     if (phase === 'dead' && this.nameSubmitted) { this.startGame(); }
   }
 
@@ -193,7 +194,7 @@ export class Game {
             this.showDead(next.score);
           }
           this.prevPhase = next.phase;
-          if (next.phase !== 'playing') break;
+          if (next.phase !== 'playing') break; // 'respawn' also pauses ticking
         }
       }
     }

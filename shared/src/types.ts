@@ -1,5 +1,5 @@
 export type Direction   = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-export type DungeonPhase = 'start' | 'playing' | 'cleared' | 'dead';
+export type DungeonPhase = 'start' | 'playing' | 'respawn' | 'dead';
 export type CellType    = 'wall' | 'floor' | 'exit';
 export type EnemyType   = 'rat' | 'skeleton' | 'demon';
 

@@ -103,6 +103,11 @@ export class Renderer {
     // Flash message
     if (state.messageTick > 0) this.drawMessage(ctx, state.message, state.messageTick);
 
+    // Respawn prompt
+    if (state.phase === 'respawn' && state.messageTick === 0) {
+      this.drawMessage(ctx, 'PRESS ANY KEY', 60);
+    }
+
     // CRT
     ctx.drawImage(this.overlay, 0, 0);
   }

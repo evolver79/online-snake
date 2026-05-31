@@ -154,6 +154,13 @@ export class GameEngine {
     this.state.snake.nextDir = dir;
   }
 
+  resume(): void {
+    if (this.state.phase === 'respawn') {
+      this.state.phase = 'playing';
+      this.state.snakeMoveTick = 0; // give a full move interval before first step
+    }
+  }
+
   tick(): DungeonState {
     const s = this.state;
     if (s.phase !== 'playing') return s;
@@ -166,10 +173,9 @@ export class GameEngine {
     const snakeMoveEvery = Math.max(SNAKE_MOVE_MIN, SNAKE_MOVE_BASE - Math.floor(floor / 2));
     const enemyMoveEvery = Math.max(ENEMY_MOVE_MIN, ENEMY_MOVE_BASE - floor);
 
-    // ── Snake move (frozen for first 40 ticks of post-respawn invincibility) ──
-    const respawnFreeze = s.invincible > INVINCIBLE_TICKS - 40;
+    // ── Snake move ───────────────────────────────────────────────────────
     s.snakeMoveTick++;
-    if (!respawnFreeze && s.snakeMoveTick >= snakeMoveEvery) {
+    if (s.snakeMoveTick >= snakeMoveEvery) {
       s.snakeMoveTick = 0;
       this.moveSnake();
       if (s.phase !== 'playing') return s;
@@ -323,6 +329,7 @@ export class GameEngine {
     s.invincible     = INVINCIBLE_TICKS;
     s.message        = 'LIFE LOST';
     s.messageTick    = 60;
+    s.phase          = 'respawn'; // frozen until player presses a key
   }
 
   private nextFloor(): void {

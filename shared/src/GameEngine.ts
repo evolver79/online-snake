@@ -59,16 +59,19 @@ function generateFloor(floor: number): { grid: CellType[][]; rooms: Room[]; enem
     }
   }
 
-  // Connect rooms with L-shaped corridors
+  // Connect rooms with 2-wide L-shaped corridors
+  const carve = (x: number, y: number) => {
+    if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) grid[y][x] = 'floor';
+  };
   for (let i = 1; i < rooms.length; i++) {
     const a = roomCenter(rooms[i - 1]);
     const b = roomCenter(rooms[i]);
     const midX = rng(seed) < 0.5 ? a.x : b.x;
-    // Horizontal segment
-    for (let cx = Math.min(a.x, midX); cx <= Math.max(a.x, midX); cx++) grid[a.y][cx] = 'floor';
-    for (let cx = Math.min(midX, b.x); cx <= Math.max(midX, b.x); cx++) grid[b.y][cx] = 'floor';
-    // Vertical segment
-    for (let cy = Math.min(a.y, b.y); cy <= Math.max(a.y, b.y); cy++) grid[cy][midX] = 'floor';
+    // Horizontal segments (2 cells tall)
+    for (let cx = Math.min(a.x, midX); cx <= Math.max(a.x, midX); cx++) { carve(cx, a.y); carve(cx, a.y + 1); }
+    for (let cx = Math.min(midX, b.x); cx <= Math.max(midX, b.x); cx++) { carve(cx, b.y); carve(cx, b.y + 1); }
+    // Vertical segment (2 cells wide)
+    for (let cy = Math.min(a.y, b.y); cy <= Math.max(a.y, b.y); cy++) { carve(midX, cy); carve(midX + 1, cy); }
   }
 
   // Place enemies in non-start rooms

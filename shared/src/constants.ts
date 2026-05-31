@@ -9,12 +9,12 @@ export const INIT_SNAKE_LEN = 3;
 export const INIT_LIVES     = 3;
 
 // Ticks (at 60 fps) between moves — decreases with floor
-export const SNAKE_MOVE_BASE  = 8;
-export const SNAKE_MOVE_MIN   = 4;
-export const ENEMY_MOVE_BASE  = 16;
-export const ENEMY_MOVE_MIN   = 9;
+export const SNAKE_MOVE_BASE  = 12;
+export const SNAKE_MOVE_MIN   = 6;
+export const ENEMY_MOVE_BASE  = 22;
+export const ENEMY_MOVE_MIN   = 11;
 
-export const INVINCIBLE_TICKS = 80;  // after losing a life
+export const INVINCIBLE_TICKS = 120;  // after losing a life
 
 export const MIN_ROOMS = 4;
 export const MAX_ROOMS = 7;

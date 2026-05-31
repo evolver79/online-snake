@@ -1,342 +1,337 @@
-import type { RunnerState, GroundTile, Obstacle, Fruit } from './types';
+import type { DungeonState, CellType, Enemy, EnemyType, Point, Room, Direction } from './types';
 import {
-  CANVAS_W, CANVAS_H, GROUND_Y, TILE_W, GRAVITY, JUMP_FORCE,
-  SLIDE_FRAMES, INIT_SPEED, MAX_SPEED, SPEED_ACCEL, INIT_LIVES,
-  INVINCIBLE_FRAMES, SPAWN_X, Y_HISTORY_SIZE, HEAD_X, SEG_SIZE,
-  DIFF_1, DIFF_2, DIFF_3,
+  MAP_W, MAP_H, INIT_SNAKE_LEN, INIT_LIVES,
+  SNAKE_MOVE_BASE, SNAKE_MOVE_MIN, ENEMY_MOVE_BASE, ENEMY_MOVE_MIN,
+  INVINCIBLE_TICKS, MIN_ROOMS, MAX_ROOMS,
 } from './constants';
 
-let _nextId = 1;
-const uid = (): number => _nextId++;
+let _uid = 1;
+const uid = (): number => _uid++;
 
-const SPIKE_W  = 10;
-const SPIKE_H  = 14;
-const BAR_W    = 12;
-const BAR_H    = 40;  // hangs from top — must slide under
-const WALL_W   = 12;
-const WALL_H   = 50;  // shorter wall — must jump over
+const DELTA: Record<Direction, Point> = {
+  UP:    { x:  0, y: -1 },
+  DOWN:  { x:  0, y:  1 },
+  LEFT:  { x: -1, y:  0 },
+  RIGHT: { x:  1, y:  0 },
+};
 
-export class GameEngine {
-  private state!: RunnerState;
-  private jumpHeld    = false;
-  private slideHeld   = false;
-  private nextObstX   = SPAWN_X + 120;  // X at which to spawn next obstacle
-  private nextFruitX  = SPAWN_X + 60;   // X at which to spawn next fruit
-  private groundRight = 0;              // rightmost x of spawned ground tiles
-  private minObstGap  = 110;            // min px between obstacles (shrinks with difficulty)
+const OPPOSITE: Record<Direction, Direction> = {
+  UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT',
+};
 
-  constructor() {
-    this.reset();
+// ── Dungeon generation ────────────────────────────────────────────────────
+
+function rng(seed: { v: number }): number {
+  seed.v = (seed.v * 1664525 + 1013904223) & 0xffffffff;
+  return (seed.v >>> 0) / 0xffffffff;
+}
+
+function roomCenter(r: Room): Point {
+  return { x: r.x + Math.floor(r.w / 2), y: r.y + Math.floor(r.h / 2) };
+}
+
+function generateFloor(floor: number): { grid: CellType[][]; rooms: Room[]; enemies: Enemy[]; startPos: Point; exitPos: Point | null } {
+  const seed = { v: floor * 1337 + 42 };
+  const grid: CellType[][] = Array.from({ length: MAP_H }, () => new Array(MAP_W).fill('wall') as CellType[]);
+
+  const roomCount = MIN_ROOMS + Math.floor(rng(seed) * (MAX_ROOMS - MIN_ROOMS + 1));
+  const rooms: Room[] = [];
+
+  // Place rooms
+  for (let i = 0; i < roomCount; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 40 && !placed; attempt++) {
+      const w = 5 + Math.floor(rng(seed) * 6);
+      const h = 4 + Math.floor(rng(seed) * 4);
+      const x = 1 + Math.floor(rng(seed) * (MAP_W - w - 2));
+      const y = 1 + Math.floor(rng(seed) * (MAP_H - h - 2));
+      const overlaps = rooms.some(r =>
+        x < r.x + r.w + 2 && x + w + 2 > r.x &&
+        y < r.y + r.h + 2 && y + h + 2 > r.y,
+      );
+      if (!overlaps) {
+        rooms.push({ x, y, w, h });
+        for (let gy = y; gy < y + h; gy++)
+          for (let gx = x; gx < x + w; gx++)
+            grid[gy][gx] = 'floor';
+        placed = true;
+      }
+    }
   }
 
-  private reset(): void {
-    _nextId = 1;
-    const ground = this.buildInitialGround();
-    this.groundRight  = CANVAS_W + TILE_W * 8;
-    this.nextObstX    = SPAWN_X + 200;
-    this.nextFruitX   = SPAWN_X + 80;
-    this.minObstGap   = 110;
+  // Connect rooms with L-shaped corridors
+  for (let i = 1; i < rooms.length; i++) {
+    const a = roomCenter(rooms[i - 1]);
+    const b = roomCenter(rooms[i]);
+    const midX = rng(seed) < 0.5 ? a.x : b.x;
+    // Horizontal segment
+    for (let cx = Math.min(a.x, midX); cx <= Math.max(a.x, midX); cx++) grid[a.y][cx] = 'floor';
+    for (let cx = Math.min(midX, b.x); cx <= Math.max(midX, b.x); cx++) grid[b.y][cx] = 'floor';
+    // Vertical segment
+    for (let cy = Math.min(a.y, b.y); cy <= Math.max(a.y, b.y); cy++) grid[cy][midX] = 'floor';
+  }
 
-    this.state = {
-      phase:       'start',
-      headY:       GROUND_Y,
-      vy:          0,
-      onGround:    true,
-      sliding:     false,
-      slideTicks:  0,
-      invincible:  0,
-      yHistory:    new Array(Y_HISTORY_SIZE).fill(GROUND_Y) as number[],
-      totalScroll: 0,
-      segments:    3,
-      ground,
-      obstacles:   [],
-      fruits:      [],
-      score:       0,
-      distance:    0,
-      scrollSpeed: INIT_SPEED,
-      tick:        0,
-      lives:       INIT_LIVES,
-      jumpQueued:  false,
+  // Place enemies in non-start rooms
+  const enemies: Enemy[] = [];
+  const types: EnemyType[] = floor < 3 ? ['rat'] : floor < 5 ? ['rat', 'skeleton'] : ['rat', 'skeleton', 'demon'];
+  for (let i = 1; i < rooms.length; i++) {
+    const room  = rooms[i];
+    const count = 1 + Math.floor(rng(seed) * Math.min(3, 1 + Math.floor(floor / 2)));
+    for (let k = 0; k < count; k++) {
+      const type: EnemyType = types[Math.floor(rng(seed) * types.length)];
+      enemies.push({
+        id:       uid(),
+        type,
+        pos: {
+          x: room.x + 1 + Math.floor(rng(seed) * (room.w - 2)),
+          y: room.y + 1 + Math.floor(rng(seed) * (room.h - 2)),
+        },
+        roomIdx:  i,
+        hp:       type === 'demon' ? 2 : 1,
+        segments: type === 'rat' ? 1 : type === 'skeleton' ? 2 : 3,
+      });
+    }
+  }
+
+  const startPos = roomCenter(rooms[0]);
+  // Exit revealed once all enemies die
+  const exitPos: Point | null = enemies.length === 0 ? roomCenter(rooms[rooms.length - 1]) : null;
+  if (exitPos && enemies.length === 0) grid[exitPos.y][exitPos.x] = 'exit';
+
+  return { grid, rooms, enemies, startPos, exitPos };
+}
+
+// ── Engine ────────────────────────────────────────────────────────────────
+
+export class GameEngine {
+  private state!: DungeonState;
+
+  constructor() { this.resetToStart(); }
+
+  private resetToStart(): void {
+    _uid = 1;
+    this.state = this.buildState(1, INIT_LIVES, 0);
+    this.state.phase = 'start';
+  }
+
+  private buildState(floor: number, lives: number, score: number): DungeonState {
+    const { grid, rooms, enemies, startPos, exitPos } = generateFloor(floor);
+    const segments: Point[] = [];
+    for (let i = 0; i < INIT_SNAKE_LEN; i++) {
+      segments.push({ x: startPos.x - i, y: startPos.y });
+    }
+
+    return {
+      phase:         'playing',
+      grid,
+      rooms,
+      snake:         { segments, dir: 'RIGHT', nextDir: 'RIGHT' },
+      enemies,
+      floor,
+      score,
+      lives,
+      tick:          0,
+      snakeMoveTick: 0,
+      enemyMoveTick: 0,
+      invincible:    0,
+      exitPos,
+      message:       floor === 1 ? '' : `FLOOR  ${floor}`,
+      messageTick:   floor === 1 ? 0 : 90,
     };
   }
 
-  private buildInitialGround(): GroundTile[] {
-    const tiles: GroundTile[] = [];
-    // Start with plenty of solid ground
-    for (let x = -TILE_W * 2; x < CANVAS_W + TILE_W * 10; x += TILE_W) {
-      tiles.push({ x, solid: true });
-    }
-    return tiles;
-  }
-
   start(): void {
-    this.reset();
-    this.state.phase = 'playing';
+    _uid = 1;
+    this.state = this.buildState(1, INIT_LIVES, 0);
   }
 
-  setJump(pressed: boolean): void {
-    if (pressed && !this.jumpHeld) {
-      if (this.state.phase === 'playing') {
-        if (this.state.onGround) {
-          this.state.vy = -JUMP_FORCE;
-          this.state.onGround = false;
-          this.state.sliding  = false;
-        } else {
-          this.state.jumpQueued = true;
-        }
-      }
-    }
-    this.jumpHeld = pressed;
-  }
-
-  setSlide(pressed: boolean): void {
-    this.slideHeld = pressed;
+  setDirection(dir: Direction): void {
     if (this.state.phase !== 'playing') return;
-    if (pressed && this.state.onGround && !this.state.sliding) {
-      this.state.sliding    = true;
-      this.state.slideTicks = SLIDE_FRAMES;
-    }
-    if (!pressed && this.state.sliding) {
-      this.state.sliding    = false;
-      this.state.slideTicks = 0;
-    }
+    if (dir === OPPOSITE[this.state.snake.dir]) return;
+    this.state.snake.nextDir = dir;
   }
 
-  tick(): RunnerState {
-    if (this.state.phase !== 'playing') return this.state;
-
+  tick(): DungeonState {
     const s = this.state;
-    s.tick        += 1;
-    s.scrollSpeed  = Math.min(MAX_SPEED, s.scrollSpeed + SPEED_ACCEL);
-    const scroll   = s.scrollSpeed;
+    if (s.phase !== 'playing') return s;
 
-    // ── Scroll ground tiles ──────────────────────────────────────────────
-    for (const t of s.ground) t.x -= scroll;
-    s.ground = s.ground.filter(t => t.x > -TILE_W * 2);
-    this.spawnGround(scroll);
+    s.tick++;
+    if (s.messageTick > 0) s.messageTick--;
+    if (s.invincible > 0)  s.invincible--;
 
-    // ── Scroll obstacles & fruits ────────────────────────────────────────
-    for (const o of s.obstacles) o.x -= scroll;
-    for (const f of s.fruits)    f.x -= scroll;
-    s.obstacles = s.obstacles.filter(o => o.x > -40);
-    s.fruits    = s.fruits.filter(f => f.x > -20 && !f.collected);
+    const floor          = s.floor;
+    const snakeMoveEvery = Math.max(SNAKE_MOVE_MIN, SNAKE_MOVE_BASE - Math.floor(floor / 2));
+    const enemyMoveEvery = Math.max(ENEMY_MOVE_MIN, ENEMY_MOVE_BASE - floor);
 
-    // ── Spawn obstacles & fruits ─────────────────────────────────────────
-    this.nextObstX  -= scroll;
-    this.nextFruitX -= scroll;
-    if (this.nextObstX <= CANVAS_W) this.spawnObstacle();
-    if (this.nextFruitX <= CANVAS_W) this.spawnFruit();
-
-    // ── Difficulty ───────────────────────────────────────────────────────
-    const dist = s.totalScroll;
-    this.minObstGap = dist > DIFF_3 ? 70 : dist > DIFF_2 ? 85 : dist > DIFF_1 ? 100 : 110;
-
-    // ── Slide timer ──────────────────────────────────────────────────────
-    if (s.sliding) {
-      s.slideTicks--;
-      if (s.slideTicks <= 0) {
-        s.sliding    = false;
-        s.slideTicks = 0;
-      }
+    // ── Snake move ───────────────────────────────────────────────────────
+    s.snakeMoveTick++;
+    if (s.snakeMoveTick >= snakeMoveEvery) {
+      s.snakeMoveTick = 0;
+      this.moveSnake();
+      if (s.phase !== 'playing') return s;
     }
 
-    // ── Gravity & vertical movement ──────────────────────────────────────
-    if (!s.onGround) {
-      s.vy      += GRAVITY;
-      s.headY   += s.vy;
-    }
-
-    // ── Ground collision ─────────────────────────────────────────────────
-    const tileUnder = this.tileAt(HEAD_X);
-    const onSolid   = tileUnder !== null && tileUnder.solid;
-
-    if (s.headY >= GROUND_Y && onSolid) {
-      s.headY   = GROUND_Y;
-      s.vy      = 0;
-      s.onGround = true;
-      // Consume buffered jump
-      if (s.jumpQueued) {
-        s.jumpQueued = false;
-        s.vy         = -JUMP_FORCE;
-        s.onGround   = false;
-      }
-    } else if (!onSolid && s.headY >= GROUND_Y) {
-      // Over a gap — fall
-      s.onGround = false;
-    }
-
-    // Fell off bottom
-    if (s.headY > CANVAS_H + 20) {
-      this.loseLife();
-      return this.state;
-    }
-
-    // Can't go above ceiling
-    if (s.headY < 10) {
-      s.headY = 10;
-      s.vy    = Math.max(0, s.vy);
-    }
-
-    // ── Record Y history ─────────────────────────────────────────────────
-    s.totalScroll += scroll;
-    const idx = Math.floor(s.totalScroll) % Y_HISTORY_SIZE;
-    s.yHistory[idx] = s.headY;
-    s.distance = Math.floor(s.totalScroll / 10);
-
-    // ── Invincibility countdown ──────────────────────────────────────────
-    if (s.invincible > 0) s.invincible--;
-
-    // ── Obstacle collision ───────────────────────────────────────────────
-    if (s.invincible === 0) {
-      const headRect = this.headRect();
-      for (const o of s.obstacles) {
-        if (rectsOverlap(headRect, { x: o.x, y: o.y, w: o.w, h: o.h })) {
-          this.loseLife();
-          return this.state;
-        }
-      }
-    }
-
-    // ── Fruit collection ─────────────────────────────────────────────────
-    const headRect = this.headRect();
-    for (const f of s.fruits) {
-      if (!f.collected && rectsOverlap(headRect, { x: f.x - 6, y: f.y - 6, w: 12, h: 12 })) {
-        f.collected = true;
-        s.score    += 1;
-        s.segments  = Math.min(s.segments + 1, 40);
-      }
+    // ── Enemy move ───────────────────────────────────────────────────────
+    s.enemyMoveTick++;
+    if (s.enemyMoveTick >= enemyMoveEvery) {
+      s.enemyMoveTick = 0;
+      this.moveEnemies();
     }
 
     return s;
   }
 
-  private tileAt(screenX: number): GroundTile | null {
-    return this.state.ground.find(t => screenX >= t.x && screenX < t.x + TILE_W) ?? null;
+  private moveSnake(): void {
+    const s    = this.state;
+    const sn   = s.snake;
+    sn.dir     = sn.nextDir;
+    const d    = DELTA[sn.dir];
+    const head = sn.segments[0];
+    const next: Point = { x: head.x + d.x, y: head.y + d.y };
+
+    // Wall collision
+    if (next.x < 0 || next.x >= MAP_W || next.y < 0 || next.y >= MAP_H || s.grid[next.y][next.x] === 'wall') {
+      this.die();
+      return;
+    }
+
+    // Self collision (tail frees its cell this tick)
+    const bodyCheck = sn.segments.slice(0, -1);
+    if (bodyCheck.some(p => p.x === next.x && p.y === next.y)) {
+      this.die();
+      return;
+    }
+
+    // Enemy collision — head kills enemy
+    const hitEnemy = s.enemies.find(e => e.pos.x === next.x && e.pos.y === next.y);
+    if (hitEnemy) {
+      hitEnemy.hp--;
+      if (hitEnemy.hp <= 0) {
+        s.enemies = s.enemies.filter(e => e.id !== hitEnemy.id);
+        s.score  += hitEnemy.segments * s.floor;
+        // Grow snake
+        for (let i = 0; i < hitEnemy.segments; i++) {
+          const tail = sn.segments[sn.segments.length - 1];
+          sn.segments.push({ ...tail });
+        }
+        // Reveal exit when last enemy dies
+        if (s.enemies.length === 0) {
+          const exitRoom = s.rooms[s.rooms.length - 1];
+          const ep       = roomCenter(exitRoom);
+          s.exitPos = ep;
+          s.grid[ep.y][ep.x] = 'exit';
+          s.message    = 'DUNGEON CLEARED';
+          s.messageTick = 90;
+        }
+      }
+    }
+
+    // Exit — advance floor
+    if (s.grid[next.y][next.x] === 'exit') {
+      sn.segments.unshift(next);
+      this.nextFloor();
+      return;
+    }
+
+    sn.segments.unshift(next);
+    if (!hitEnemy) sn.segments.pop(); // only pop if didn't grow
   }
 
-  private headRect(): { x: number; y: number; w: number; h: number } {
-    const s = this.state;
-    const h = s.sliding ? Math.floor(SEG_SIZE * 0.5) : SEG_SIZE;
-    return { x: HEAD_X - 4, y: s.headY - h + 2, w: 8, h: h - 2 };
+  private moveEnemies(): void {
+    const s    = this.state;
+    const head = s.snake.segments[0];
+
+    const bodySet = new Set(s.snake.segments.map(p => `${p.x},${p.y}`));
+    const enemySet = new Set(s.enemies.map(e => `${e.pos.x},${e.pos.y}`));
+
+    for (const enemy of s.enemies) {
+      const room    = s.rooms[enemy.roomIdx];
+      const inRoom  = head.x >= room.x && head.x < room.x + room.w &&
+                      head.y >= room.y && head.y < room.y + room.h;
+      const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+
+      let moved = false;
+
+      if (inRoom) {
+        // Chase: move toward head
+        const preferred: Direction[] = dirs.sort((a, b) => {
+          const na = { x: enemy.pos.x + DELTA[a].x, y: enemy.pos.y + DELTA[a].y };
+          const nb = { x: enemy.pos.x + DELTA[b].x, y: enemy.pos.y + DELTA[b].y };
+          const da = Math.abs(na.x - head.x) + Math.abs(na.y - head.y);
+          const db = Math.abs(nb.x - head.x) + Math.abs(nb.y - head.y);
+          return da - db;
+        });
+        for (const dir of preferred) {
+          const np = { x: enemy.pos.x + DELTA[dir].x, y: enemy.pos.y + DELTA[dir].y };
+          if (this.enemyCanMove(np, room, bodySet, enemySet, enemy.id)) {
+            enemySet.delete(`${enemy.pos.x},${enemy.pos.y}`);
+            enemy.pos = np;
+            enemySet.add(`${np.x},${np.y}`);
+            moved = true;
+            break;
+          }
+        }
+      }
+
+      if (!moved) {
+        // Patrol: random move within room
+        const shuffled = [...dirs].sort(() => Math.random() - 0.5);
+        for (const dir of shuffled) {
+          const np = { x: enemy.pos.x + DELTA[dir].x, y: enemy.pos.y + DELTA[dir].y };
+          if (this.enemyCanMove(np, room, bodySet, enemySet, enemy.id)) {
+            enemySet.delete(`${enemy.pos.x},${enemy.pos.y}`);
+            enemy.pos = np;
+            enemySet.add(`${np.x},${np.y}`);
+            break;
+          }
+        }
+      }
+
+      // Enemy stepped onto snake head
+      if (enemy.pos.x === head.x && enemy.pos.y === head.y && s.invincible === 0) {
+        this.die();
+        return;
+      }
+    }
   }
 
-  private loseLife(): void {
+  private enemyCanMove(np: Point, room: Room, bodySet: Set<string>, enemySet: Set<string>, selfId: number): boolean {
+    if (np.x < room.x || np.x >= room.x + room.w) return false;
+    if (np.y < room.y || np.y >= room.y + room.h) return false;
+    if (this.state.grid[np.y][np.x] === 'wall') return false;
+    if (bodySet.has(`${np.x},${np.y}`)) return false;
+    if (enemySet.has(`${np.x},${np.y}`)) return false;
+    return true;
+  }
+
+  private die(): void {
     const s = this.state;
     s.lives--;
     if (s.lives <= 0) {
       s.phase = 'dead';
       return;
     }
-    // Respawn: reset to ground, short snake, invincibility
-    s.headY      = GROUND_Y;
-    s.vy         = 0;
-    s.onGround   = true;
-    s.sliding    = false;
-    s.slideTicks = 0;
-    s.invincible = INVINCIBLE_FRAMES;
-    s.segments   = Math.max(3, Math.floor(s.segments / 2));
-    // Clear nearby obstacles so the respawn isn't immediately lethal
-    s.obstacles  = s.obstacles.filter(o => o.x > HEAD_X + 80 || o.x < HEAD_X - 20);
+    // Respawn at start room, shorter snake, invincibility
+    const start      = roomCenter(s.rooms[0]);
+    const newLen     = Math.max(INIT_SNAKE_LEN, Math.floor(s.snake.segments.length / 2));
+    s.snake.segments = Array.from({ length: newLen }, (_, i) => ({ x: start.x - i, y: start.y }));
+    s.snake.dir      = 'RIGHT';
+    s.snake.nextDir  = 'RIGHT';
+    s.invincible     = INVINCIBLE_TICKS;
+    s.message        = 'LIFE LOST';
+    s.messageTick    = 60;
   }
 
-  // ── Spawning ─────────────────────────────────────────────────────────────
-
-  private spawnGround(scroll: number): void {
-    const dist = this.state.totalScroll;
-    // Gap probability: 0 at start, rises with difficulty
-    const gapChance = dist < 400 ? 0 :
-                      dist < DIFF_1 ? 0.08 :
-                      dist < DIFF_2 ? 0.13 :
-                      dist < DIFF_3 ? 0.18 : 0.22;
-
-    const maxGapTiles = dist < DIFF_1 ? 1 : dist < DIFF_2 ? 2 : 3;
-
-    while (this.groundRight < CANVAS_W + TILE_W * 10) {
-      const x = this.groundRight;
-      if (Math.random() < gapChance) {
-        const gapLen = 1 + Math.floor(Math.random() * maxGapTiles);
-        for (let i = 0; i < gapLen; i++) {
-          this.state.ground.push({ x: x + i * TILE_W, solid: false });
-        }
-        this.groundRight += gapLen * TILE_W;
-        // Always add solid after gap
-        this.state.ground.push({ x: this.groundRight, solid: true });
-        this.groundRight += TILE_W;
-      } else {
-        this.state.ground.push({ x, solid: true });
-        this.groundRight += TILE_W;
-      }
-    }
-    this.groundRight -= scroll;
+  private nextFloor(): void {
+    const s        = this.state;
+    const nextFloor = s.floor + 1;
+    const prevLen   = s.snake.segments.length;
+    const newState  = this.buildState(nextFloor, s.lives, s.score);
+    // Carry snake length into next floor
+    const startPos  = roomCenter(newState.rooms[0]);
+    newState.snake.segments = Array.from({ length: prevLen }, (_, i) => ({ x: startPos.x - i, y: startPos.y }));
+    this.state = newState;
   }
 
-  private spawnObstacle(): void {
-    const dist  = this.state.totalScroll;
-    const solid = this.solidAhead(SPAWN_X);
-
-    // Don't spawn directly over a gap in ground
-    if (!solid) {
-      this.nextObstX = SPAWN_X + 30;
-      return;
-    }
-
-    // Pick type based on difficulty
-    const r = Math.random();
-    let type: 'spike' | 'bar' | 'wall';
-    if (dist < DIFF_1)      { type = 'spike'; }
-    else if (dist < DIFF_2) { type = r < 0.6 ? 'spike' : r < 0.8 ? 'bar' : 'wall'; }
-    else                    { type = r < 0.5 ? 'spike' : r < 0.75 ? 'bar' : 'wall'; }
-
-    let o: Obstacle;
-    if (type === 'spike') {
-      o = { id: uid(), x: SPAWN_X, y: GROUND_Y - SPIKE_H, w: SPIKE_W, h: SPIKE_H, type };
-    } else if (type === 'bar') {
-      o = { id: uid(), x: SPAWN_X, y: 0, w: BAR_W, h: BAR_H, type };
-    } else {
-      o = { id: uid(), x: SPAWN_X, y: GROUND_Y - WALL_H, w: WALL_W, h: WALL_H, type };
-    }
-
-    this.state.obstacles.push(o);
-
-    const gap = this.minObstGap + Math.floor(Math.random() * 60);
-    this.nextObstX = SPAWN_X + gap;
-  }
-
-  private spawnFruit(): void {
-    const dist  = this.state.totalScroll;
-    const solid = this.solidAhead(SPAWN_X);
-    if (!solid) {
-      this.nextFruitX = SPAWN_X + 40;
-      return;
-    }
-
-    // Fruit Y: on ground or floating
-    const floating = dist > DIFF_1 && Math.random() < 0.35;
-    const y = floating
-      ? GROUND_Y - 30 - Math.floor(Math.random() * 30)
-      : GROUND_Y - 8;
-
-    this.state.fruits.push({ id: uid(), x: SPAWN_X, y, collected: false });
-    const gap = 90 + Math.floor(Math.random() * 80);
-    this.nextFruitX = SPAWN_X + gap;
-  }
-
-  private solidAhead(screenX: number): boolean {
-    const tile = this.state.ground.find(
-      t => screenX >= t.x && screenX < t.x + TILE_W
-    );
-    return tile?.solid ?? true;
-  }
-
-  getState(): RunnerState {
-    return this.state;
-  }
-}
-
-function rectsOverlap(
-  a: { x: number; y: number; w: number; h: number },
-  b: { x: number; y: number; w: number; h: number },
-): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x &&
-         a.y < b.y + b.h && a.y + a.h > b.y;
+  getState(): DungeonState { return this.state; }
 }

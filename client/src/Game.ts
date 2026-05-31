@@ -11,57 +11,50 @@ export class Game {
   private input:    InputHandler;
   private lb:       Leaderboard;
 
-  private rafId      = 0;
-  private lastTime   = 0;
-  private accum      = 0;
-  private readonly STEP = 1000 / 60; // 60 fps fixed step
+  private rafId     = 0;
+  private highScore = 0;
 
-  private phase: 'start' | 'playing' | 'dead' = 'start';
-  private highScore  = 0;
-  private nameShown  = false;
   private nameSubmitted = false;
   private pendingScore  = 0;
   private pendingName   = '';
 
-  // HTML elements for overlay UI
-  private overlay:       HTMLElement;
-  private overlayTitle:  HTMLElement;
-  private overlayScore:  HTMLElement;
-  private overlaySub:    HTMLElement;
-  private nameEntry:     HTMLElement;
-  private nameInput:     HTMLInputElement;
-  private nameError:     HTMLElement;
-  private nameSubmit:    HTMLButtonElement;
-  private lbEl:          HTMLElement;
-  private lbRows:        HTMLElement;
-  private toastEl:       HTMLElement;
+  private overlay:    HTMLElement;
+  private ovTitle:    HTMLElement;
+  private ovScore:    HTMLElement;
+  private ovSub:      HTMLElement;
+  private nameEntry:  HTMLElement;
+  private nameInput:  HTMLInputElement;
+  private nameError:  HTMLElement;
+  private nameSubmit: HTMLButtonElement;
+  private lbEl:       HTMLElement;
+  private lbRows:     HTMLElement;
+  private toastEl:    HTMLElement;
+  private hintsEl:    HTMLElement;
 
   constructor(container: HTMLElement) {
     this.engine   = new GameEngine();
     this.renderer = new Renderer(container);
     this.input    = new InputHandler(
-      p => this.engine.setJump(p),
-      p => this.engine.setSlide(p),
-      ()  => this.onAnyKey(),
+      d  => this.engine.setDirection(d),
+      () => this.onAnyKey(),
     );
-    this.lb = new Leaderboard((name, score) => {
-      this.showToast(`${name}  ${score}`);
-    });
+    this.lb = new Leaderboard((name, score) => this.showToast(`${name}  ${score}`));
     this.lb.subscribe();
 
-    this.overlay      = document.getElementById('overlay')!;
-    this.overlayTitle = document.getElementById('overlay-title')!;
-    this.overlayScore = document.getElementById('overlay-score')!;
-    this.overlaySub   = document.getElementById('overlay-sub')!;
-    this.nameEntry    = document.getElementById('name-entry')!;
-    this.nameInput    = document.getElementById('name-input') as HTMLInputElement;
-    this.nameError    = document.getElementById('name-error')!;
-    this.nameSubmit   = document.getElementById('name-submit') as HTMLButtonElement;
-    this.lbEl         = document.getElementById('leaderboard')!;
-    this.lbRows       = document.getElementById('leaderboard-rows')!;
-    this.toastEl      = document.getElementById('toast-container')!;
+    this.overlay    = document.getElementById('overlay')!;
+    this.ovTitle    = document.getElementById('overlay-title')!;
+    this.ovScore    = document.getElementById('overlay-score')!;
+    this.ovSub      = document.getElementById('overlay-sub')!;
+    this.nameEntry  = document.getElementById('name-entry')!;
+    this.nameInput  = document.getElementById('name-input') as HTMLInputElement;
+    this.nameError  = document.getElementById('name-error')!;
+    this.nameSubmit = document.getElementById('name-submit') as HTMLButtonElement;
+    this.lbEl       = document.getElementById('leaderboard')!;
+    this.lbRows     = document.getElementById('leaderboard-rows')!;
+    this.toastEl    = document.getElementById('toast-container')!;
+    this.hintsEl    = document.getElementById('controls-hint')!;
 
-    this.highScore = parseInt(localStorage.getItem('snake-runner-hs') ?? '0', 10);
+    this.highScore = parseInt(localStorage.getItem('snake-dungeon-hs') ?? '0', 10);
 
     this.nameSubmit.addEventListener('click', () => this.submitName());
     this.nameInput.addEventListener('keydown', e => {
@@ -76,13 +69,12 @@ export class Game {
 
   private onAnyKey(): void {
     if (!this.nameEntry.classList.contains('hidden')) return;
-    if (this.phase === 'start') { this.startGame(); return; }
-    if (this.phase === 'dead' && this.nameSubmitted) { this.startGame(); }
+    const phase = this.engine.getState().phase;
+    if (phase === 'start') { this.startGame(); return; }
+    if (phase === 'dead' && this.nameSubmitted) { this.startGame(); }
   }
 
   private startGame(): void {
-    this.phase        = 'playing';
-    this.nameShown    = false;
     this.nameSubmitted = false;
     this.pendingScore  = 0;
     this.pendingName   = '';
@@ -92,44 +84,39 @@ export class Game {
     this.overlay.classList.add('hidden');
     this.lbEl.classList.add('hidden');
     this.nameEntry.classList.add('hidden');
+    this.hintsEl.classList.add('hidden');
     this.engine.start();
     sound.uiClick();
   }
 
   private showStart(): void {
-    this.phase = 'start';
     this.overlay.classList.remove('hidden');
-    this.overlayTitle.textContent = 'SNAKE RUNNER';
-    this.overlayScore.textContent = '';
-    this.overlaySub.textContent   = 'PRESS ANY KEY TO START';
+    this.ovTitle.textContent = 'SNAKE DUNGEON';
+    this.ovScore.textContent = '';
+    this.ovSub.textContent   = 'PRESS ANY KEY TO START';
     this.nameEntry.classList.add('hidden');
+    this.hintsEl.classList.remove('hidden');
   }
 
   private showDead(score: number): void {
-    this.phase        = 'dead';
     this.pendingScore = score;
-
     if (score > this.highScore) {
       this.highScore = score;
-      localStorage.setItem('snake-runner-hs', String(score));
+      localStorage.setItem('snake-dungeon-hs', String(score));
     }
-
     this.overlay.classList.remove('hidden');
-    this.overlayTitle.textContent = 'GAME OVER';
-    this.overlayScore.textContent = String(score);
-    this.overlaySub.textContent   = '';
+    this.ovTitle.textContent = 'GAME OVER';
+    this.ovScore.textContent = String(score);
+    this.ovSub.textContent   = '';
     this.nameEntry.classList.add('hidden');
+    this.hintsEl.classList.remove('hidden');
     sound.death();
-
     this.fetchLb();
-
-    // Show name entry after 1.5 s
     setTimeout(() => {
-      if (this.phase !== 'dead') return;
-      this.nameShown = true;
+      if (this.engine.getState().phase !== 'dead') return;
       this.nameEntry.classList.remove('hidden');
       this.nameInput.focus();
-    }, 1500);
+    }, 1200);
   }
 
   private async submitName(): Promise<void> {
@@ -142,10 +129,7 @@ export class Game {
     }
     this.nameError.textContent = '';
     this.nameSubmit.disabled = true;
-    try {
-      await this.lb.submit(name, this.pendingScore);
-      this.pendingName = name;
-    } catch { /* non-critical */ }
+    try { await this.lb.submit(name, this.pendingScore); this.pendingName = name; } catch { /**/ }
     this.finishName();
     await this.fetchLb(this.pendingScore, this.pendingName);
   }
@@ -156,7 +140,7 @@ export class Game {
     this.nameSubmitted = true;
     this.nameEntry.classList.add('hidden');
     this.nameInput.blur();
-    this.overlaySub.textContent = 'PRESS ANY KEY TO RESTART';
+    this.ovSub.textContent = 'PRESS ANY KEY TO RESTART';
   }
 
   private async fetchLb(hs?: number, hn?: string): Promise<void> {
@@ -165,8 +149,7 @@ export class Game {
       this.lbRows.innerHTML = '';
       if (rows.length === 0) {
         const li = document.createElement('li');
-        li.textContent = 'NO SCORES YET';
-        li.style.opacity = '0.3';
+        li.textContent = 'NO SCORES YET'; li.style.opacity = '0.3';
         this.lbRows.appendChild(li);
       } else {
         rows.forEach((r, i) => {
@@ -180,37 +163,32 @@ export class Game {
         });
       }
       this.lbEl.classList.remove('hidden');
-    } catch { /* non-critical */ }
+    } catch { /**/ }
   }
 
   private showToast(msg: string): void {
     const el = document.createElement('div');
-    el.className   = 'toast';
-    el.textContent = msg;
+    el.className = 'toast'; el.textContent = msg;
     this.toastEl.appendChild(el);
     el.addEventListener('animationend', () => el.remove());
   }
 
+  private prevPhase = 'start';
+
   private loop = (time: number): void => {
     this.rafId = requestAnimationFrame(this.loop);
-    const dt   = Math.min(time - this.lastTime, 50);
-    this.lastTime = time;
+    const state = this.engine.getState();
 
-    if (this.phase === 'playing') {
-      this.accum += dt;
-      while (this.accum >= this.STEP) {
-        this.accum -= this.STEP;
-        this.engine.tick();
-        const state = this.engine.getState();
-        if (state.phase === 'dead') {
-          this.showDead(state.score);
-          break;
-        }
+    if (state.phase === 'playing') {
+      this.engine.tick();
+      const next = this.engine.getState();
+      if (next.phase === 'dead' && this.prevPhase === 'playing') {
+        this.showDead(next.score);
       }
+      this.prevPhase = next.phase;
     }
 
-    const state = this.engine.getState();
-    this.renderer.render(state, time);
+    this.renderer.render(this.engine.getState(), time);
   };
 
   destroy(): void {

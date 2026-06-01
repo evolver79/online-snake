@@ -63,6 +63,8 @@ export class Game {
       if (e.key === 'Escape') { e.stopPropagation(); this.skipName(); }
     });
 
+    document.getElementById('scores-btn')!.addEventListener('click', () => this.toggleLb());
+
     this.showStart();
     this.fetchLb();
     this.rafId = requestAnimationFrame(this.loop);
@@ -72,7 +74,7 @@ export class Game {
     if (!this.nameEntry.classList.contains('hidden')) return;
     const phase = this.engine.getState().phase;
     if (phase === 'start')   { this.startGame(); return; }
-    if (phase === 'respawn') { this.engine.resume(); return; }
+    if (phase === 'respawn') { this.lastTickTime = performance.now(); this.engine.resume(); return; }
     if (phase === 'dead' && this.nameSubmitted) { this.startGame(); }
   }
 

@@ -100,20 +100,30 @@
       min-height: 1.2em;
     }
 
+    /* ── Bottom bar ──────────────────────────────────────────────────── */
+    #bottom-bar {
+      position: absolute;
+      bottom: 6px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
     #scores-btn {
       background: transparent;
-      border: 1px solid rgba(34,204,68,0.25);
-      color: rgba(34,204,68,0.4);
+      border: 1px solid rgba(34,204,68,0.2);
+      color: rgba(34,204,68,0.35);
       font-family: 'Share Tech Mono', monospace;
-      font-size: clamp(5px, 1vw, 8px);
-      letter-spacing: 4px;
-      padding: 4px 14px;
+      font-size: clamp(5px, 0.9vw, 7px);
+      letter-spacing: 3px;
+      padding: 3px 10px;
       cursor: pointer;
       pointer-events: all;
-      margin-top: 10px;
       transition: color 0.15s, border-color 0.15s;
     }
-    #scores-btn:hover { color: #22cc44; border-color: rgba(34,204,68,0.5); }
+    #scores-btn:hover { color: #22cc44; border-color: rgba(34,204,68,0.45); }
 
     #name-submit {
       background: transparent;
@@ -225,7 +235,6 @@
       <div id="overlay-title">SNAKE DUNGEON</div>
       <div id="overlay-score"></div>
       <p id="overlay-sub">PRESS ANY KEY TO START</p>
-      <button id="scores-btn" onclick="document.getElementById('leaderboard').classList.toggle('hidden');document.getElementById('scores-btn').textContent=document.getElementById('leaderboard').classList.contains('hidden')?'VIEW SCORES':'HIDE SCORES'">VIEW SCORES</button>
       <div id="name-entry" class="hidden">
         <div id="name-label">ENTER YOUR NAME</div>
         <input id="name-input" type="text" maxlength="12" placeholder="PLAYER" autocomplete="off" spellcheck="false" />
@@ -239,8 +248,12 @@
       <ul id="leaderboard-rows"></ul>
     </div>
 
-    <div id="controls-hint">WASD / ARROWS  —  KILL ALL ENEMIES  —  REACH THE EXIT  —  TAB: SCORES</div>
+    <div id="controls-hint">WASD / ARROWS  —  KILL ALL ENEMIES  —  REACH THE EXIT</div>
     <div id="toast-container"></div>
+
+    <div id="bottom-bar">
+      <button id="scores-btn">SCORES</button>
+    </div>
 
   </div>
   <script type="module" src="/src/main.ts"></script>

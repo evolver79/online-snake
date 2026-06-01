@@ -29,7 +29,7 @@ export class InputHandler {
 
   private handleClick = (e: PointerEvent): void => {
     const target = e.target as HTMLElement;
-    if (target.closest('#name-entry')) return;
+    if (target.closest('button, input, a')) return;
     if (target.closest('#leaderboard'))  { this.onToggleLb(); return; }
     this.onAnyKey();
   };

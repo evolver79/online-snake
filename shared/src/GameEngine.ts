@@ -197,6 +197,11 @@ export class GameEngine {
   }
 
   setDirection(dir: Direction): void {
+    if (this.state.phase === 'respawn') {
+      // Queue the chosen direction so the snake heads that way on resume
+      if (dir !== OPPOSITE[this.state.snake.dir]) this.state.snake.nextDir = dir;
+      return;
+    }
     if (this.state.phase !== 'playing') return;
     if (dir === OPPOSITE[this.state.snake.dir]) return;
     this.state.snake.nextDir = dir;

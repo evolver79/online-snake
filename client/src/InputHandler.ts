@@ -19,6 +19,9 @@ export class InputHandler {
 
   private handle = (e: KeyboardEvent): void => {
     if (e.key === 'Tab') { e.preventDefault(); this.onToggleLb(); return; }
+    // Don't intercept keys when a text input is focused (name entry etc.)
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
     const dir = KEY_DIR[e.key];
     if (dir) { e.preventDefault(); this.onDir(dir); }
     this.onAnyKey();

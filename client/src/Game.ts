@@ -141,12 +141,9 @@ export class Game {
 
   private toggleLb(): void {
     if (this.lbEl.classList.contains('hidden')) {
-      this.fetchLb();          // refresh before showing
+      this.fetchLb(); // refresh then show
     } else {
-      // only hide during gameplay — keep visible on start/dead screens
-      if (this.engine.getState().phase === 'playing' || this.engine.getState().phase === 'respawn') {
-        this.lbEl.classList.add('hidden');
-      }
+      this.lbEl.classList.add('hidden');
     }
   }
 

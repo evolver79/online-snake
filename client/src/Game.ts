@@ -166,8 +166,9 @@ export class Game {
 
   private finishName(): void {
     this.nameSubmitted = true;
+    this.nameInput.blur();            // blur while still visible so browser transfers focus cleanly
     this.nameEntry.classList.add('hidden');
-    this.nameInput.blur();
+    (document.activeElement as HTMLElement | null)?.blur(); // ensure no stale focus
     this.ovSub.textContent = 'PRESS ANY KEY TO RESTART';
     this.autoReturnId = window.setTimeout(() => this.autoReturn(), 10_000);
   }

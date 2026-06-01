@@ -14,9 +14,10 @@ export class Game {
   private rafId     = 0;
   private highScore = 0;
 
-  private nameSubmitted = false;
-  private pendingScore  = 0;
-  private pendingName   = '';
+  private nameSubmitted  = false;
+  private pendingScore   = 0;
+  private pendingName    = '';
+  private autoReturnId   = 0;
 
   private overlay:    HTMLElement;
   private ovTitle:    HTMLElement;
@@ -79,6 +80,8 @@ export class Game {
   }
 
   private startGame(): void {
+    clearTimeout(this.autoReturnId);
+    this.autoReturnId  = 0;
     this.nameSubmitted = false;
     this.pendingScore  = 0;
     this.pendingName   = '';
@@ -166,6 +169,14 @@ export class Game {
     this.nameEntry.classList.add('hidden');
     this.nameInput.blur();
     this.ovSub.textContent = 'PRESS ANY KEY TO RESTART';
+    this.autoReturnId = window.setTimeout(() => this.autoReturn(), 10_000);
+  }
+
+  private autoReturn(): void {
+    this.autoReturnId = 0;
+    this.engine.reset();
+    this.showStart();
+    // leaderboard stays visible from the showDead fetch
   }
 
   private async fetchLb(hs?: number, hn?: string): Promise<import('./Leaderboard').ScoreRow[]> {

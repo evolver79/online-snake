@@ -196,6 +196,12 @@ export class GameEngine {
     this.state = this.buildState(1, INIT_LIVES, 0);
   }
 
+  reset(): void {
+    _uid = 1;
+    this.state = this.buildState(1, INIT_LIVES, 0);
+    this.state.phase = 'start';
+  }
+
   setDirection(dir: Direction): void {
     if (this.state.phase === 'respawn') {
       // Queue the chosen direction so the snake heads that way on resume

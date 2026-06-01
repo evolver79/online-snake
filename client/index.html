@@ -100,6 +100,21 @@
       min-height: 1.2em;
     }
 
+    #scores-btn {
+      background: transparent;
+      border: 1px solid rgba(34,204,68,0.25);
+      color: rgba(34,204,68,0.4);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(5px, 1vw, 8px);
+      letter-spacing: 4px;
+      padding: 4px 14px;
+      cursor: pointer;
+      pointer-events: all;
+      margin-top: 10px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #scores-btn:hover { color: #22cc44; border-color: rgba(34,204,68,0.5); }
+
     #name-submit {
       background: transparent;
       border: 1px solid rgba(34,204,68,0.3);
@@ -210,6 +225,7 @@
       <div id="overlay-title">SNAKE DUNGEON</div>
       <div id="overlay-score"></div>
       <p id="overlay-sub">PRESS ANY KEY TO START</p>
+      <button id="scores-btn" onclick="document.getElementById('leaderboard').classList.toggle('hidden');document.getElementById('scores-btn').textContent=document.getElementById('leaderboard').classList.contains('hidden')?'VIEW SCORES':'HIDE SCORES'">VIEW SCORES</button>
       <div id="name-entry" class="hidden">
         <div id="name-label">ENTER YOUR NAME</div>
         <input id="name-input" type="text" maxlength="12" placeholder="PLAYER" autocomplete="off" spellcheck="false" />

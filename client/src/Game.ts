@@ -101,25 +101,37 @@ export class Game {
     this.hintsEl.classList.remove('hidden');
   }
 
-  private showDead(score: number): void {
+  private async showDead(score: number): Promise<void> {
     this.pendingScore = score;
     if (score > this.highScore) {
       this.highScore = score;
       localStorage.setItem('snake-dungeon-hs', String(score));
     }
     this.overlay.classList.remove('hidden');
-    this.ovTitle.textContent = 'GAME OVER';
-    this.ovScore.textContent = String(score);
+    this.ovTitle.textContent = '';
+    this.ovScore.textContent = '';
     this.ovSub.textContent   = '';
     this.nameEntry.classList.add('hidden');
     this.hintsEl.classList.remove('hidden');
     sound.death();
-    this.fetchLb();
-    setTimeout(() => {
-      if (this.engine.getState().phase !== 'dead') return;
+
+    // Fetch leaderboard and wait the minimum display pause in parallel
+    const [rows] = await Promise.all([
+      this.fetchLb(),
+      new Promise<void>(r => setTimeout(r, 1200)),
+    ]);
+
+    if (this.engine.getState().phase !== 'dead') return;
+
+    // Only prompt for name if score strictly beats the 10th place (or board not full)
+    const lowestTop = rows.length > 0 ? rows[rows.length - 1].score : -1;
+    const qualifies = rows.length < 10 || score > lowestTop;
+    if (qualifies) {
       this.nameEntry.classList.remove('hidden');
       this.nameInput.focus();
-    }, 1200);
+    } else {
+      this.finishName();
+    }
   }
 
   private async submitName(): Promise<void> {
@@ -154,7 +166,7 @@ export class Game {
     this.ovSub.textContent = 'PRESS ANY KEY TO RESTART';
   }
 
-  private async fetchLb(hs?: number, hn?: string): Promise<void> {
+  private async fetchLb(hs?: number, hn?: string): Promise<import('./Leaderboard').ScoreRow[]> {
     try {
       const rows = await this.lb.fetchTop(10);
       this.lbRows.innerHTML = '';
@@ -174,7 +186,8 @@ export class Game {
         });
       }
       this.lbEl.classList.remove('hidden');
-    } catch { /**/ }
+      return rows;
+    } catch { return []; }
   }
 
   private showToast(msg: string): void {

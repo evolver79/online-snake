@@ -104,6 +104,7 @@ export class Game {
     this.ovSub.textContent   = 'PRESS ANY KEY TO START';
     this.nameEntry.classList.add('hidden');
     this.hintsEl.classList.remove('hidden');
+    this.lbEl.classList.add('hidden'); // canvas draws scores during start
   }
 
   private async showDead(score: number): Promise<void> {
@@ -183,6 +184,7 @@ export class Game {
   private async fetchLb(hs?: number, hn?: string): Promise<import('./Leaderboard').ScoreRow[]> {
     try {
       const rows = await this.lb.fetchTop(10);
+      this.renderer.setLeaderboard(rows);
       this.lbRows.innerHTML = '';
       if (rows.length === 0) {
         const li = document.createElement('li');

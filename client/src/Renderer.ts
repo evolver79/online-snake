@@ -42,6 +42,7 @@ const GLYPHS: Record<string, number[]> = {
   'H':[0xa,0xa,0xe,0xa,0xa],'Y':[0xa,0xa,0x4,0x4,0x4],'K':[0xa,0xc,0x8,0xc,0xa],
   'P':[0xe,0xa,0xe,0x8,0x8],'B':[0xc,0xa,0xc,0xa,0xc],'X':[0xa,0xa,0x4,0xa,0xa],
   'M':[0xa,0xe,0xa,0xa,0xa],'V':[0xa,0xa,0xa,0xa,0x4],'W':[0xa,0xa,0xe,0xe,0xa],
+  'J':[0xe,0x2,0x2,0xa,0x4],'Q':[0xe,0xa,0xa,0xe,0x2],'Z':[0xe,0x2,0x4,0x8,0xe],
   ' ':[0,0,0,0,0],
 };
 
@@ -49,6 +50,11 @@ export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx:    CanvasRenderingContext2D;
   private overlay: HTMLCanvasElement;
+  private lbCache: Array<{ name: string; score: number }> = [];
+
+  setLeaderboard(rows: Array<{ name: string; score: number }>): void {
+    this.lbCache = rows;
+  }
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -348,6 +354,8 @@ export class Renderer {
       this.pixelText(ctx, s1, x1, y1, sc);
       ctx.fillStyle = '#22bb44';
       this.pixelText(ctx, s2, x2, y2, sc);
+
+      this.drawLbOnCanvas(ctx);
     } else {
       // "GAME OVER" — red, scale 4
       const sc  = 4;
@@ -377,6 +385,51 @@ export class Renderer {
     // Subtle shimmer
     ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.04 * Math.sin(state.tick * 0.05)})`;
     ctx.fillRect(0, 0, CANVAS_W, playH);
+  }
+
+  private drawLbOnCanvas(ctx: CanvasRenderingContext2D): void {
+    const rows = this.lbCache.slice(0, 5);
+    if (rows.length === 0) return;
+
+    // "TOP SCORES" header — scale 2, centered
+    const header = 'TOP SCORES';
+    const hSc = 2;
+    const hx   = Math.floor((CANVAS_W - header.length * 5 * hSc) / 2);
+    const hy   = 136;
+
+    ctx.fillStyle = 'rgba(34,204,68,0.22)';
+    this.pixelText(ctx, header, hx, hy, hSc);
+
+    // Separator
+    ctx.fillStyle = 'rgba(34,204,68,0.1)';
+    ctx.fillRect(130, hy + 12, 220, 1);
+
+    // Columns (scale 1 — each char 5 px wide)
+    const rankRight = 158; // right edge of rank column
+    const nameX     = 165; // left edge of name column
+    const scoreRight = 350; // right edge of score column
+
+    let ry = hy + 19;
+    for (let i = 0; i < rows.length; i++) {
+      const r       = rows[i];
+      const rank    = String(i + 1);
+      const nameStr = r.name.slice(0, 12).toUpperCase();
+      const scoreStr = String(r.score);
+
+      // Rank — very dim
+      ctx.fillStyle = 'rgba(34,204,68,0.25)';
+      this.pixelText(ctx, rank, rankRight - rank.length * 5, ry, 1);
+
+      // Name — medium
+      ctx.fillStyle = 'rgba(34,204,68,0.55)';
+      this.pixelText(ctx, nameStr, nameX, ry, 1);
+
+      // Score — bright
+      ctx.fillStyle = HUD_GREEN;
+      this.pixelText(ctx, scoreStr, scoreRight - scoreStr.length * 5, ry, 1);
+
+      ry += 9;
+    }
   }
 
   private drawMessage(ctx: CanvasRenderingContext2D, msg: string, tick: number): void {
